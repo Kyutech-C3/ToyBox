@@ -1,6 +1,8 @@
 [submodule "ToyBox-frontend"]
 	path = ToyBox-frontend
 	url = https://github.com/Kyutech-C3/ToyBox-frontend
+	branch = main
 [submodule "toybox-server"]
 	path = toybox-server
 	url = https://github.com/Kyutech-C3/toybox-server
+	branch = main
