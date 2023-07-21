@@ -1,0 +1,107 @@
+#!/bin/bash
+
+# help
+function usage {
+  cat <<EOM
+Usage: $(basename "$0") [OPTION]...
+  -bucket VALUE  set bucket name
+  -endpoint-url VALUE  set endpoint url
+EOM
+
+  exit 2
+}
+
+CMDNAME=$(basename $0)
+
+# get options
+while getopts hbe-: OPT; do
+  optarg="${!OPTIND}"
+  [[ "$OPT" = - ]] && OPT="-$OPTARG"
+
+  case "-$OPT" in
+  -b | --bucket)
+    FLG_BUCKET_NAME="TRUE"
+    VALUE_BUCKET_NAME=$optarg
+    shift
+    ;;
+  -e | --endpoint-url)
+    FLG_ENDPOINT_URL="TRUE"
+    VALUE_ENDPOINT_URL=$optarg
+    shift
+    ;;
+  --)
+    break
+    ;;
+  -\?)
+    exit 1
+    ;;
+  -h | --help | *)
+    usage
+    shift
+    ;;
+  esac
+done
+shift $((OPTIND - 1))
+
+# check options
+if [ "$FLG_BUCKET_NAME" == "" ]; then
+  echo "Error: --bucket is not set." 1>&2
+  echo "Usage: $CMDNAME [--bucket VALUE] [--endpoint-url]" 1>&2
+  exit 1
+fi
+
+if [ "$FLG_ENDPOINT_URL" == "" ]; then
+  echo "Error: --endpoint-url is not set." 1>&2
+  echo "Usage: $CMDNAME [--bucket VALUE] [--endpoint-url]" 1>&2
+  exit 1
+fi
+
+echo "bucket name: $VALUE_BUCKET_NAME"
+echo "endpoint url: $VALUE_ENDPOINT_URL"
+
+function getMimeType() {
+  case "$1" in
+  png) echo "image/png" ;;
+  jpg) echo "image/jpeg" ;;
+  jpeg) echo "image/jpeg" ;;
+  bmp) echo "image/bmp" ;;
+  gif) echo "image/gif" ;;
+  webp) echo "image/webp" ;;
+  mp4) echo "video/mp4" ;;
+  mov) echo "video/quicktime" ;;
+  avi) echo "video/x-msvideo" ;;
+  flv) echo "video/x-flv" ;;
+  mp3) echo "audio/mpeg" ;;
+  wav) echo "audio/wav" ;;
+  m4a) echo "audio/aac" ;;
+  zip) echo "application/zip" ;;
+  gltf) echo "model/gltf+json" ;;
+  *) echo "application/octet-stream" ;;
+  esac
+}
+
+extensions=("png" "jpg" "jpeg" "bmp" "gif" "webp" "mp4" "mov" "avi" "flv" "mp3" "wav" "m4a" "zip" "gltf")
+
+for EXTENSION in ${extensions[@]}; do
+  echo "extension: ${EXTENSION}"
+  echo "mime type: $(getMimeType ${EXTENSION})"
+
+  # fix mime type
+  for KEY in $(aws s3api list-objects \
+    --bucket $VALUE_BUCKET_NAME \
+    --query "Contents[].[Key]" \
+    --prefix assets \
+    --output text \
+    --endpoint-url=$VALUE_ENDPOINT_URL | grep "\.${EXTENSION}$"); do
+    echo $KEY
+    aws s3api copy-object \
+      --bucket $VALUE_BUCKET_NAME \
+      --copy-source $VALUE_BUCKET_NAME/$KEY \
+      --key $KEY \
+      --metadata-directive "REPLACE" \
+      --content-type $(getMimeType ${EXTENSION}) \
+      --endpoint-url=$VALUE_ENDPOINT_URL
+  done
+done
+
+echo "done"
